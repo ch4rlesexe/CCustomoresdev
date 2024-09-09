@@ -11,12 +11,11 @@ import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
-import org.bukkit.event.player.PlayerItemHeldEvent;
-import org.bukkit.event.player.PlayerPickupItemEvent;
+import org.bukkit.event.player.*;
 import org.bukkit.event.world.ChunkLoadEvent;
-import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -25,11 +24,7 @@ import org.bukkit.potion.PotionEffectType;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.File;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Random;
-import java.util.Set;
+import java.util.*;
 
 public class CCustomores extends JavaPlugin implements Listener {
 
@@ -41,7 +36,6 @@ public class CCustomores extends JavaPlugin implements Listener {
 
     @Override
     public void onEnable() {
-        // Load config and messages
         saveDefaultConfig();
         config = getConfig();
         loadMessages();
@@ -78,21 +72,40 @@ public class CCustomores extends JavaPlugin implements Listener {
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        if (label.equalsIgnoreCase("ccustomores")) {
+        if (label.equalsIgnoreCase("ccustomore")) {
             if (args.length == 1 && args[0].equalsIgnoreCase("reload")) {
                 if (sender.hasPermission("ccustomores.reload")) {
-                    reloadConfig();
-                    config = getConfig();
-                    loadMessages();
-                    loadOresConfig();  // Reload chests config on reload
-                    sender.sendMessage(ChatColor.GREEN + "CCustomores configuration and messages reloaded.");
+                    reloadPlugin(sender);
                 } else {
                     sender.sendMessage(ChatColor.RED + "You don't have permission to use this command.");
                 }
                 return true;
+            } else if (args.length == 4 && args[0].equalsIgnoreCase("give")) {
+                giveCustomOre(sender, args[1], args[2], Integer.parseInt(args[3]));
+                return true;
             }
         }
+        sender.sendMessage(ChatColor.RED + "Usage: /ccustomore <give/reload> [orename] [player] [amount]");
         return false;
+    }
+
+    private void reloadPlugin(CommandSender sender) {
+        reloadConfig();
+        loadMessages();
+        loadOresConfig();
+        sender.sendMessage(ChatColor.GREEN + "Configuration and messages reloaded.");
+    }
+
+    private void giveCustomOre(CommandSender sender, String oreName, String playerName, int amount) {
+        Player target = Bukkit.getPlayer(playerName);
+        if (target != null) {
+            ItemStack oreItem = createOreItem(oreName);
+            oreItem.setAmount(amount);
+            target.getInventory().addItem(oreItem);
+            sender.sendMessage(ChatColor.GREEN + "Gave " + amount + " of " + oreName + " to " + playerName);
+        } else {
+            sender.sendMessage(ChatColor.RED + "Player not found.");
+        }
     }
 
     // Listen for when a chunk is loaded
@@ -101,98 +114,113 @@ public class CCustomores extends JavaPlugin implements Listener {
         Chunk chunk = event.getChunk();
         String chunkKey = chunk.getX() + "," + chunk.getZ();
 
-        // Only attempt to spawn if the chunk is new (hasn't been loaded before) and no chest has been spawned in this chunk
         if (!spawnedChunks.contains(chunkKey)) {
             World world = chunk.getWorld();
             Random random = new Random();
 
-            // For each ore, check spawn chances and light levels from ores.yml
             for (String oreKey : chestConfig.getConfigurationSection("ores").getKeys(false)) {
                 int spawnChance = chestConfig.getInt("ores." + oreKey + ".spawn_chance", 2);
                 int lightLevel = chestConfig.getInt("ores." + oreKey + ".light_level", 8);
 
-                // Run the spawn chance and attempt to spawn the chest
                 if (random.nextInt(spawnChance) == 0) {
                     int chunkX = chunk.getX();
                     int chunkZ = chunk.getZ();
                     spawnOreChest(world, chunkX, chunkZ, oreKey, lightLevel);
-                    spawnedChunks.add(chunkKey);  // Mark the chunk as having a chest spawned
-                    break;  // Stop after one chest is spawned for the chunk
+                    spawnedChunks.add(chunkKey);
+                    break;
                 }
             }
         }
     }
 
-
-    @EventHandler
-    public void onPlayerQuit(PlayerQuitEvent event) {
-        playerOreEffects.remove(event.getPlayer());  // Reset ore effects tracking
-    }
-
     @EventHandler
     public void onInventoryClick(InventoryClickEvent event) {
-        applyOreEffects((Player) event.getWhoClicked());
+        Player player = (Player) event.getWhoClicked();
+        applyOreEffects(player);
     }
 
     @EventHandler
     public void onInventoryClose(InventoryCloseEvent event) {
-        applyOreEffects((Player) event.getPlayer());
+        Player player = (Player) event.getPlayer();
+        applyOreEffects(player);
     }
 
     @EventHandler
     public void onPlayerItemHeld(PlayerItemHeldEvent event) {
-        applyOreEffects(event.getPlayer());
+        Player player = event.getPlayer();
+        applyOreEffects(player);
     }
 
     @EventHandler
     public void onPlayerPickupItem(PlayerPickupItemEvent event) {
-        applyOreEffects(event.getPlayer());
+        Player player = event.getPlayer();
+        applyOreEffects(player);
     }
 
+    @EventHandler
+    public void onPlayerJoin(PlayerJoinEvent event) {
+        Player player = event.getPlayer();
+        applyOreEffects(player);
+    }
+
+    @EventHandler
+    public void onPlayerDrop(PlayerDropItemEvent event) {
+        Player player = event.getPlayer();
+        applyOreEffects(player);
+    }
+
+    @EventHandler
+    public void onEntityPickupItem(EntityPickupItemEvent event) {
+        // Check if the entity is a player
+        if (event.getEntity() instanceof Player) {
+            Player player = (Player) event.getEntity();
+            applyOreEffects(player);
+        }
+    }
+
+
+
+
     private void applyOreEffects(Player player) {
+
         for (String oreKey : chestConfig.getConfigurationSection("ores").getKeys(false)) {
             boolean hasOre = false;
 
             // Check if the player has the ore in their inventory
             for (ItemStack item : player.getInventory().getContents()) {
-                if (item != null && item.getType() == Material.getMaterial(chestConfig.getString("ores." + oreKey + ".type", "IRON_INGOT"))
-                        && item.getItemMeta() != null
-                        && chestConfig.getString("ores." + oreKey + ".display_name", "§fAmberite").equals(item.getItemMeta().getDisplayName())) {
-                    hasOre = true;
-                    break;
+                if (item != null) {
+
+                    if (item.getType() == Material.getMaterial(chestConfig.getString("ores." + oreKey + ".type", "IRON_INGOT"))
+                            && item.getItemMeta() != null
+                            && item.getItemMeta().hasDisplayName()
+                            && item.getItemMeta().getDisplayName().equals(ChatColor.translateAlternateColorCodes('&', chestConfig.getString("ores." + oreKey + ".display_name")))) {
+                        hasOre = true;
+                        break;
+                    }
                 }
             }
 
             Map<String, Boolean> playerEffects = playerOreEffects.getOrDefault(player, new HashMap<>());
 
             if (hasOre) {
-                // If the player has the ore, apply all effects from ores.yml if not already applied
                 if (!playerEffects.getOrDefault(oreKey, false)) {
-                    // Get the list of effects from ores.yml
                     if (chestConfig.contains("ores." + oreKey + ".potion_effects")) {
                         for (Map<?, ?> effectData : chestConfig.getMapList("ores." + oreKey + ".potion_effects")) {
                             String effectName = (String) effectData.get("effect");
-
-                            // Get the level or default to 1 if not present
-                            Integer effectLevel = (Integer) effectData.get("level");
-                            if (effectLevel == null) {
-                                effectLevel = 1; // Default level is 1
-                            }
+                            Object levelObj = effectData.get("level");
+                            int effectLevel = (levelObj instanceof Integer) ? (Integer) levelObj : 1;
 
                             PotionEffectType effectType = PotionEffectType.getByName(effectName);
                             if (effectType != null) {
-                                // Apply the potion effect
                                 player.addPotionEffect(new PotionEffect(effectType, Integer.MAX_VALUE, effectLevel - 1, true, false));
                             }
                         }
                         player.sendMessage(getMessage("ore_effect_applied").replace("{ore}", oreKey));
-                        playerEffects.put(oreKey, true);  // Mark that the player has the effect applied
+                        playerEffects.put(oreKey, true);
                     }
                 }
             } else {
-                // Remove the effects if the player no longer has the ore
                 if (playerEffects.getOrDefault(oreKey, false)) {
-                    // Get the list of effects from ores.yml
                     if (chestConfig.contains("ores." + oreKey + ".potion_effects")) {
                         for (Map<?, ?> effectData : chestConfig.getMapList("ores." + oreKey + ".potion_effects")) {
                             String effectName = (String) effectData.get("effect");
@@ -204,7 +232,7 @@ public class CCustomores extends JavaPlugin implements Listener {
                         }
                         player.sendMessage(getMessage("ore_effect_removed").replace("{ore}", oreKey));
                     }
-                    playerEffects.put(oreKey, false);  // Mark that the effect has been removed
+                    playerEffects.put(oreKey, false);
                 }
             }
 
@@ -220,18 +248,14 @@ public class CCustomores extends JavaPlugin implements Listener {
         int z = chunkZ * 16 + random.nextInt(16);
         int y;
 
-        // Start checking from y=0 upwards, looking for cave locations
         for (y = world.getMinHeight(); y < world.getMaxHeight(); y++) {
             Block block = world.getBlockAt(x, y, z);
             Block aboveBlock = block.getRelative(0, 1, 0);
 
-            // Check for air block with solid block below it and ensure it's not exposed to the sky
             if (block.getType() == Material.AIR && aboveBlock.getType() == Material.AIR && block.getRelative(0, -1, 0).getType().isSolid()) {
-                if (aboveBlock.getLightFromSky() <= lightLevel) {  // Use ore-specific light level setting
-                    // Place chest here
+                if (aboveBlock.getLightFromSky() <= lightLevel) {
                     block.setType(Material.CHEST);
 
-                    // Add the ore item to the chest
                     BlockState state = block.getState();
                     if (state instanceof Chest) {
                         Chest chest = (Chest) state;
@@ -252,12 +276,11 @@ public class CCustomores extends JavaPlugin implements Listener {
                     } else {
                         getLogger().warning("Failed to create chest at: " + x + ", " + y + ", " + z);
                     }
-                    return;  // Stop further scanning once chest is placed
+                    return;
                 }
             }
         }
     }
-
 
     private ItemStack createOreItem(String oreKey) {
         Material material = Material.getMaterial(chestConfig.getString("ores." + oreKey + ".type", "IRON_INGOT"));
@@ -269,7 +292,6 @@ public class CCustomores extends JavaPlugin implements Listener {
         oreItem.setItemMeta(meta);
         return oreItem;
     }
-
 
     public FileConfiguration getChestConfig() {
         return chestConfig;
