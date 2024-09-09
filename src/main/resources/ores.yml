@@ -1,0 +1,20 @@
+ores:
+  Better_Ore:
+    type: DIAMOND
+    display_name: "&bBetter Ore"
+    potion_effects:
+      - effect: STRENGTH
+        level: 2
+      - effect: HASTE
+        level: 2
+    spawn_chance: 1
+    light_level: 0
+
+  Apex_Ore:
+    type: GOLD_INGOT
+    display_name: "&6Apex Ore"
+    potion_effects:
+      - effect: SPEED
+        level: 1
+    spawn_chance: 3
+    light_level: 5

@@ -1,0 +1,14 @@
+name: CCustomores
+version: 1.0
+main: org.charlie.cCustomores.CCustomores
+api-version: 1.20
+commands:
+  ccustomores:
+    description: Main command for the CCustomores plugin.
+    permission: ccustomores.reload
+    permission-message: You don't have permission to use this command.
+
+permissions:
+  ccustomores.reload:
+    description: Allows the player to reload the CCustomores plugin configuration.
+    default: op

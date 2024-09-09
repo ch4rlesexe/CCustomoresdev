@@ -1,0 +1,3 @@
+ore_effect_applied: "&a{ore} effect applied!"
+ore_effect_removed: "&c{ore} effect removed."
+chest_spawned: "&7(Admin) &6A chest with {ore} has spawned at coordinates: &e{x}, {y}, {z}"
