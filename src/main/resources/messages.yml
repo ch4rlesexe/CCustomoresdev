@@ -1,6 +1,10 @@
+# Placeholders include %ore% and %player%
+
 config_reloaded: "&aConfiguration and messages have been reloaded."
-ore_given: "&aGave {amount} {ore} to {player}."
+ore_given: "&aGave %amount% %ore% to %player%."
 player_not_found: "&cPlayer not found."
-chest_spawned: "&aA chest has spawned at coordinates: &bX: {x}, Y: {y}, Z: {z}"
-ore_effect_applied: "&aYou feel the power of {ore}."
-ore_effect_removed: "&cYou feel the effects of {ore} fade away."
+chest_spawned: "&aA chest has spawned at coordinates: &bX: %x%, Y: %y%, Z: %z%"
+ore_effect_applied: "&aYou feel the power of %ore%."
+ore_effect_removed: "&cYou feel the effects of %ore% fade away."
+no_permission: "&cYou don't have permission to use this command."
+command_usage: "&cUsage: /ccustomore <give/reload> [orename] [player] [amount]"

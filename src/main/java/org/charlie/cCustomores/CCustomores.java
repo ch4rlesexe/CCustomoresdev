@@ -66,8 +66,14 @@ public class CCustomores extends JavaPlugin implements Listener {
         chestConfig = YamlConfiguration.loadConfiguration(chestFile);
     }
 
-    private String getMessage(String key) {
-        return ChatColor.translateAlternateColorCodes('&', messages.getString(key, ""));
+    private String getMessage(String key, Map<String, String> placeholders) {
+        String message = ChatColor.translateAlternateColorCodes('&', messages.getString(key, ""));
+        if (placeholders != null) {
+            for (Map.Entry<String, String> entry : placeholders.entrySet()) {
+                message = message.replace("%" + entry.getKey() + "%", entry.getValue());
+            }
+        }
+        return message;
     }
 
     @Override
@@ -77,7 +83,7 @@ public class CCustomores extends JavaPlugin implements Listener {
                 if (sender.hasPermission("ccustomores.reload")) {
                     reloadPlugin(sender);
                 } else {
-                    sender.sendMessage(ChatColor.RED + "You don't have permission to use this command.");
+                    sender.sendMessage(getMessage("no_permission", null));
                 }
                 return true;
             } else if (args.length == 4 && args[0].equalsIgnoreCase("give")) {
@@ -85,7 +91,7 @@ public class CCustomores extends JavaPlugin implements Listener {
                 return true;
             }
         }
-        sender.sendMessage(ChatColor.RED + "Usage: /ccustomore <give/reload> [orename] [player] [amount]");
+        sender.sendMessage(getMessage("command_usage", null));
         return false;
     }
 
@@ -93,7 +99,7 @@ public class CCustomores extends JavaPlugin implements Listener {
         reloadConfig();
         loadMessages();
         loadOresConfig();
-        sender.sendMessage(ChatColor.GREEN + "Configuration and messages reloaded.");
+        sender.sendMessage(getMessage("config_reloaded", null));
     }
 
     private void giveCustomOre(CommandSender sender, String oreName, String playerName, int amount) {
@@ -102,9 +108,14 @@ public class CCustomores extends JavaPlugin implements Listener {
             ItemStack oreItem = createOreItem(oreName);
             oreItem.setAmount(amount);
             target.getInventory().addItem(oreItem);
-            sender.sendMessage(ChatColor.GREEN + "Gave " + amount + " of " + oreName + " to " + playerName);
+
+            Map<String, String> placeholders = new HashMap<>();
+            placeholders.put("amount", String.valueOf(amount));
+            placeholders.put("ore", oreName);
+            placeholders.put("player", playerName);
+            sender.sendMessage(getMessage("ore_given", placeholders));
         } else {
-            sender.sendMessage(ChatColor.RED + "Player not found.");
+            sender.sendMessage(getMessage("player_not_found", null));
         }
     }
 
@@ -154,7 +165,9 @@ public class CCustomores extends JavaPlugin implements Listener {
     @EventHandler
     public void onPlayerPickupItem(PlayerPickupItemEvent event) {
         Player player = event.getPlayer();
-        applyOreEffects(player);
+
+        // Schedule the effect to be applied after 1 tick
+        Bukkit.getScheduler().runTaskLater(this, () -> applyOreEffects(player), 1L);
     }
 
     @EventHandler
@@ -177,9 +190,6 @@ public class CCustomores extends JavaPlugin implements Listener {
             applyOreEffects(player);
         }
     }
-
-
-
 
     private void applyOreEffects(Player player) {
 
@@ -215,7 +225,9 @@ public class CCustomores extends JavaPlugin implements Listener {
                                 player.addPotionEffect(new PotionEffect(effectType, Integer.MAX_VALUE, effectLevel - 1, true, false));
                             }
                         }
-                        player.sendMessage(getMessage("ore_effect_applied").replace("{ore}", oreKey));
+                        Map<String, String> placeholders = new HashMap<>();
+                        placeholders.put("ore", oreKey);
+                        player.sendMessage(getMessage("ore_effect_applied", placeholders));
                         playerEffects.put(oreKey, true);
                     }
                 }
@@ -230,7 +242,9 @@ public class CCustomores extends JavaPlugin implements Listener {
                                 player.removePotionEffect(effectType);
                             }
                         }
-                        player.sendMessage(getMessage("ore_effect_removed").replace("{ore}", oreKey));
+                        Map<String, String> placeholders = new HashMap<>();
+                        placeholders.put("ore", oreKey);
+                        player.sendMessage(getMessage("ore_effect_removed", placeholders));
                     }
                     playerEffects.put(oreKey, false);
                 }
@@ -239,8 +253,6 @@ public class CCustomores extends JavaPlugin implements Listener {
             playerOreEffects.put(player, playerEffects);
         }
     }
-
-
 
     public void spawnOreChest(World world, int chunkX, int chunkZ, String oreKey, int lightLevel) {
         Random random = new Random();
@@ -263,10 +275,12 @@ public class CCustomores extends JavaPlugin implements Listener {
                         ItemStack oreItem = createOreItem(oreKey);
                         inventory.addItem(oreItem);
                         getLogger().info(oreKey + " added to chest at: " + x + ", " + y + ", " + z);
-                        String message = getMessage("chest_spawned")
-                                .replace("{x}", String.valueOf(x))
-                                .replace("{y}", String.valueOf(y))
-                                .replace("{z}", String.valueOf(z));
+                        Map<String, String> placeholders = new HashMap<>();
+                        placeholders.put("x", String.valueOf(x));
+                        placeholders.put("y", String.valueOf(y));
+                        placeholders.put("z", String.valueOf(z));
+
+                        String message = getMessage("chest_spawned", placeholders);
 
                         for (Player player : Bukkit.getOnlinePlayers()) {
                             if (player.isOp()) {
